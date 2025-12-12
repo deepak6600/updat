@@ -25,6 +25,10 @@ ChildLogin is an Android application for child monitoring and parental control. 
    ```properties
    sdk.dir=/path/to/your/Android/Sdk
    ```
+4. **Network Requirements**: Building requires internet access to:
+   - Google Maven Repository (`dl.google.com`) for Android Gradle Plugin and AndroidX libraries
+   - Maven Central (`repo1.maven.org`) for general dependencies
+   - Gradle Plugin Portal for build tools
 
 ### Build Commands
 
@@ -117,6 +121,12 @@ chmod +x gradlew
 ## Security Notes
 - Never commit `local.properties`, `*.jks`, `*.keystore`, or `keystore.properties` files to version control
 - These files are automatically excluded via `.gitignore`
+
+## Adaptive Icons
+The application includes adaptive icons for modern Android launchers (API 26+):
+- Location: `app/src/main/res/mipmap-anydpi-v26/`
+- Files: `c_launcher.xml`, `c_launcher_round.xml`
+- Configuration: Uses separate background and foreground layers for dynamic launcher presentation
 
 ## License
 Proprietary - Universal Developers Private Limited
