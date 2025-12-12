@@ -62,6 +62,11 @@ android {
     }
 }
 
+// Hilt Gradle plugin configuration for KSP
+hilt {
+    enableAggregatingTask = true
+}
+
 // Set the JVM toolchain and compiler options for Kotlin
 kotlin {
     jvmToolchain(17)
@@ -135,6 +140,11 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+}
+
+// KSP processor args for Hilt
+ksp {
+    arg("dagger.hilt.android.internal.projectType", "APP")
 }
 
 //Universal Developers Private Limited
