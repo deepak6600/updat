@@ -6,6 +6,9 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+    plugins {
+        id("com.google.devtools.ksp") version "2.2.21-1.0.30"
+    }
 }
 
 plugins {

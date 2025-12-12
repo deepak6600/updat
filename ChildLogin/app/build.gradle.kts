@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("kotlin-parcelize")
     id("com.google.dagger.hilt.android")
-    kotlin("kapt")
+    id("com.google.devtools.ksp")
 
 }
 
@@ -79,15 +79,15 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.cardview:cardview:1.0.0")
     // Android Lifecycle
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.10.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.9.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
 
     // WorkManager KTX (resolves OneTimeWorkRequestBuilder, workDataOf, CoroutineWorker)
-    implementation("androidx.work:work-runtime-ktx:2.11.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // Kotlin Coroutines Android (for CoroutineWorker)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
@@ -115,16 +115,16 @@ dependencies {
 
     // Glide Image Loading (Latest)
     implementation("com.github.bumptech.glide:glide:5.0.5")
-    kapt("com.github.bumptech.glide:compiler:5.0.5")
+    ksp("com.github.bumptech.glide:compiler:5.0.5")
 
     // Hilt (Updated to 2.57.2 & Switched to KSP)
     val hiltVersion = "2.57.2"
     implementation("com.google.dagger:hilt-android:$hiltVersion")
-    kapt("com.google.dagger:hilt-android-compiler:$hiltVersion")
+    ksp("com.google.dagger:hilt-android-compiler:$hiltVersion")
 
     // Hilt Worker integration (Updated to 1.2.0)
-    implementation("androidx.hilt:hilt-work:1.3.0")
-    kapt("androidx.hilt:hilt-compiler:1.3.0")
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
 
     // RxJava3 & RxBinding
     implementation("com.jakewharton.rxbinding4:rxbinding:4.0.0")
