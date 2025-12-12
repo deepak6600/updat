@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.WorkerParameters
 import com.safe.setting.app.data.model.Audio
 import com.safe.setting.app.data.model.Video
@@ -30,18 +31,32 @@ class UploadWorker(
     context: Context,
     params: WorkerParameters
 ): CoroutineWorker(context, params) {
+    companion object {
+        const val KEY_FILE_PATH = "FILE_PATH"
+        const val KEY_FILE_TYPE = "FILE_TYPE"
+        const val KEY_RANDOM_NAME = "RANDOM_NAME"
+        const val KEY_ERROR = "error"
+    }
 
     @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun doWork(): Result {
-        val filePath = inputData.getString("FILE_PATH") ?: return Result.failure()
-        val fileType = inputData.getString("FILE_TYPE") ?: return Result.failure()
-        val randomName = inputData.getString("RANDOM_NAME") ?: return Result.failure()
+        val filePath = inputData.getString(KEY_FILE_PATH) ?: return Result.failure(
+            Data.Builder().putString(KEY_ERROR, "Missing FILE_PATH").build()
+        )
+        val fileType = inputData.getString(KEY_FILE_TYPE) ?: return Result.failure(
+            Data.Builder().putString(KEY_ERROR, "Missing FILE_TYPE").build()
+        )
+        val randomName = inputData.getString(KEY_RANDOM_NAME) ?: return Result.failure(
+            Data.Builder().putString(KEY_ERROR, "Missing RANDOM_NAME").build()
+        )
 
         val file = File(filePath)
 
         if (!file.exists() || file.length() == 0L) {
             updateStatus(fileType, randomName, Consts.STATE_FAILED, "File not found or empty")
-            return Result.failure()
+            return Result.failure(
+                Data.Builder().putString(KEY_ERROR, "File not found or empty").build()
+            )
         }
 
         return try {

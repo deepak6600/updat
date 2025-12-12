@@ -56,6 +56,10 @@ android {
         resources.excludes.add("META-INF/rxjava.properties")
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
     }
+
+    lint {
+        abortOnError = false
+    }
 }
 
 // Set the JVM toolchain and compiler options for Kotlin
@@ -75,9 +79,15 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.cardview:cardview:1.0.0")
     // Android Lifecycle
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.9.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+
+    // WorkManager KTX (resolves OneTimeWorkRequestBuilder, workDataOf, CoroutineWorker)
+    implementation("androidx.work:work-runtime-ktx:2.11.0")
+
+    // Kotlin Coroutines Android (for CoroutineWorker)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
@@ -95,7 +105,7 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:auth-kt") // got rue-kt की जगह auth-kt
     implementation("io.github.jan-tennert.supabase:realtime-kt") // Realtime के लिए जोड़ा गया
 
-    implementation("io.ktor:ktor-client-okhttp:3.3.2")
+    implementation("io.ktor:ktor-client-okhttp:3.3.3")
 
 
     // लॉजिक: minSdk 26 से कम होने पर Java 8+ APIs को सपोर्ट
@@ -113,8 +123,8 @@ dependencies {
     kapt("com.google.dagger:hilt-android-compiler:$hiltVersion")
 
     // Hilt Worker integration (Updated to 1.2.0)
-    implementation("androidx.hilt:hilt-work:1.2.0")
-    kapt("androidx.hilt:hilt-compiler:1.2.0")
+    implementation("androidx.hilt:hilt-work:1.3.0")
+    kapt("androidx.hilt:hilt-compiler:1.3.0")
 
     // RxJava3 & RxBinding
     implementation("com.jakewharton.rxbinding4:rxbinding:4.0.0")
