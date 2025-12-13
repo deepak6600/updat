@@ -54,6 +54,12 @@
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="33">
 
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:node="remove" />
+
+
         <meta-data
             android:name="androidx.work.impl.WorkManagerInitializer"
             android:value="false" />

@@ -48,6 +48,8 @@
 
 # Play Services Location internals
 -dontwarn com.google.android.gms.internal.location.**
+ -keep class com.google.android.gms.internal.location.zze { *; }
+ -keepclassmembers class com.google.android.gms.internal.location.zze { *; }
 
 # Supabase & Ktor
 -keep class io.supabase.** { *; }
