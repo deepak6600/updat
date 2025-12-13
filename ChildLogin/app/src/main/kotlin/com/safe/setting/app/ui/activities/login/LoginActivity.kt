@@ -17,7 +17,6 @@ import com.safe.setting.app.ui.activities.register.RegisterActivity
 import com.safe.setting.app.utils.ConstFun.startAnimateActivity
 import com.safe.setting.app.utils.Consts.TEXT
 import com.safe.setting.app.utils.KeyboardUtils
-import io.reactivex.rxjava3.disposables.Disposable
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -129,7 +128,7 @@ class LoginActivity : BaseActivity<ActivityLoginBinding>(), InterfaceViewLogin, 
         interactor.signInDisposable(edtEmail.text.toString(), edtPass.text.toString())
     }
 
-    override fun addDisposable(disposable: Disposable) {}
+    // Disposable management removed; use lifecycle-aware coroutines
 
     override fun successResult(result: Boolean, filter: Boolean) {
         hideDialog()

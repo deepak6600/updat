@@ -21,7 +21,6 @@ import com.safe.setting.app.ui.activities.mainchild.MainChildActivity
 import com.safe.setting.app.utils.ConstFun.startAnimateActivity
 import com.safe.setting.app.utils.Consts.TEXT
 import com.safe.setting.app.utils.KeyboardUtils
-import io.reactivex.rxjava3.disposables.Disposable
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -134,7 +133,7 @@ class RegisterActivity : BaseActivity<ActivityRegisterBinding>(), InterfaceViewR
     }
     // **** बदलाव समाप्त ****
 
-    override fun addDisposable(disposable: Disposable) {}
+    // Disposable management removed; use lifecycle-aware coroutines
 
     override fun successResult(result: Boolean, filter: Boolean) {
         hideDialog()

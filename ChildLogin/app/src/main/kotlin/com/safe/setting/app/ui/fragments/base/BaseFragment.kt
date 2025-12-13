@@ -10,7 +10,7 @@ import androidx.viewbinding.ViewBinding
 import com.safe.setting.app.ui.activities.base.BaseActivity
 import com.safe.setting.app.ui.activities.base.InterfaceView
 import com.safe.setting.app.ui.widget.toolbar.CustomToolbar
-import io.reactivex.rxjava3.disposables.Disposable
+ 
 
 abstract class BaseFragment<VB : ViewBinding> : Fragment(), InterfaceView, CustomToolbar.OnToolbarActionListener, IOnFragmentListener {
 
@@ -77,13 +77,7 @@ abstract class BaseFragment<VB : ViewBinding> : Fragment(), InterfaceView, Custo
         baseActivity.showError(message)
     }
 
-    override fun addDisposable(disposable: Disposable) {
-        baseActivity.addDisposable(disposable)
-    }
-
-    override fun clearDisposable() {
-        baseActivity.clearDisposable()
-    }
+    // Disposable management removed; use lifecycle-aware coroutines in activities/fragments
 
     // ... बाकी के फंक्शन्स वैसे ही रहेंगे ...
     override fun changeChild(fragmentTag: String){

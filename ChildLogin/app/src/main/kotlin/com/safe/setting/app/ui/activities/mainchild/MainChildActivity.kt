@@ -38,7 +38,6 @@ import com.safe.setting.app.utils.async.AsyncTaskRunCommand
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.HiddenCameraUtils.canOverDrawOtherApps
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.HiddenCameraUtils.openDrawOverPermissionSetting
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.config.CameraFacing
-import io.reactivex.rxjava3.disposables.Disposable
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
@@ -112,7 +111,7 @@ class MainChildActivity : BaseActivity<ActivityMainChildBinding>() {
         switchPrimeHardware.isChecked = isHardwarePrimed
     }
 
-    override fun addDisposable(disposable: Disposable) {}
+    // Disposable management removed; use lifecycle-aware coroutines
 
     private fun init() {
         // ... (init function mein koi badlav nahi)

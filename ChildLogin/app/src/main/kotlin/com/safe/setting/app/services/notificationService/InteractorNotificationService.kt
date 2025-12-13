@@ -16,12 +16,22 @@ import com.safe.setting.app.utils.Consts.NOTIFICATION_MESSAGE
 import com.safe.setting.app.utils.FileHelper
 import com.safe.setting.app.utils.FileHelper.getFileNameBitmap
 import com.safe.setting.app.utils.supabase.SupabaseManager
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.CompositeDisposable
-import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.rx3.asFlow
+import kotlinx.coroutines.Dispatchers
 import java.io.File
 import javax.inject.Inject
 
@@ -35,11 +45,32 @@ class InteractorNotificationService @Inject constructor(@ApplicationContext priv
 
     override fun getNotificationExists(id: String, exec: () -> Unit) {
         if (firebase.getUser()!=null) {
-            disposable.add(firebase.queryValueEventSingle("$NOTIFICATION_MESSAGE/$DATA","nameImage",id)
-                .map { value -> value.exists() }
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe({ if (!it) exec() },{ Log.e(Consts.TAG,it.message.toString()) }))
+            val scope = CoroutineScope(Dispatchers.Main)
+            val job: Job = scope.launch {
+                flow {
+                    val snapshot = withContext(Dispatchers.IO) {
+                        firebase.queryValueEventSingle("$NOTIFICATION_MESSAGE/$DATA","nameImage",id).blockingGet()
+                    }
+                    emit(snapshot?.exists() == true)
+                }
+                    .retryWhen { cause, attempt ->
+                        val baseDelayMs = 500L
+                        val multiplier = 2.0
+                        val maxDelayMs = 10_000L
+                        val jitterPct = 0.2
+                        if (attempt < 3) {
+                            val computed = (baseDelayMs * Math.pow(multiplier, attempt.toDouble())).toLong()
+                            val delay = kotlin.math.min(maxDelayMs, computed)
+                            val jitter = (delay * jitterPct).toLong()
+                            val jittered = delay + (-jitter..jitter).random()
+                            kotlinx.coroutines.delay(kotlin.math.max(0L, jittered))
+                            true
+                        } else false
+                    }
+                    .catch { e -> Log.e(Consts.TAG, e.message.toString()) }
+                    .collect { exists -> if (!exists) exec() }
+            }
+            // Disposable bridge removed; use job reference if needed
         }
     }
 

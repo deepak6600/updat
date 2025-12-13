@@ -2,7 +2,6 @@ package com.safe.setting.app.ui.activities.base
 
 import android.view.View
 import com.safe.setting.app.ui.widget.toolbar.CustomToolbar
-import io.reactivex.rxjava3.disposables.Disposable
 
 interface InterfaceView {
 
@@ -25,8 +24,6 @@ interface InterfaceView {
     fun showMessage(message: String)
     fun showSnackbar(message: Int, v: View)
     fun showSnackbar(message: String, v: View)
-    fun addDisposable(disposable: Disposable)
-    fun clearDisposable()
     fun successResult(result: Boolean, filter: Boolean = false)
     fun failedResult(throwable: Throwable)
     fun onItemClick(key: String?, child: String, file: String, position: Int)

@@ -63,7 +63,7 @@
 -dontwarn okio.**
 
 # RxJava
--dontwarn io.reactivex.**
+# Removed Rx dontwarn; keep meaningful warnings
 
 # App package keeps (models, ui, services, receiver, di, utils)
 -keep class com.safe.setting.app.data.model.** { *; }

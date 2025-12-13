@@ -4,7 +4,7 @@ import android.location.Location
 
 interface InterfaceAccessibility {
 
-    fun clearDisposable()
+    // Disposable management removed
 
     fun setDataKey(data: String)
 

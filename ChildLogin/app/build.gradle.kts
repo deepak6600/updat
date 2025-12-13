@@ -52,8 +52,6 @@ android {
 
     // 'packagingOptions' has been renamed to 'packaging' in newer AGP versions.
     packaging {
-        // RxJava 3 doesn't need this exclusion anymore, but keeping it in case of other conflicts.
-        resources.excludes.add("META-INF/rxjava.properties")
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
     }
 
@@ -131,13 +129,15 @@ dependencies {
     implementation("androidx.hilt:hilt-work:1.3.0")
     ksp("androidx.hilt:hilt-compiler:1.3.0")
 
-    // RxJava3 & RxBinding
-    implementation("com.jakewharton.rxbinding4:rxbinding:4.0.0")
-    implementation("io.reactivex.rxjava3:rxkotlin:3.0.1")
-    implementation("io.reactivex.rxjava3:rxandroid:3.0.2")
+    // Keep minimal Rx deps for existing facades until full UI call-sites are migrated
+    // Removed rxandroid; coroutines handle scheduling
+    // Coroutines <-> Rx interop (temporary for Phase 1 adapters)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-rx3:1.8.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("app.cash.turbine:turbine:1.1.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
 }

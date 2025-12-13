@@ -3,24 +3,20 @@ package com.safe.setting.app.services.base
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
-import io.reactivex.rxjava3.disposables.CompositeDisposable
-import io.reactivex.rxjava3.disposables.Disposable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 abstract class BaseService : Service(), InterfaceService {
 
-    private lateinit var compositeDisposable: CompositeDisposable
+    protected lateinit var serviceScope: CoroutineScope
 
     override fun onBind(p0: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        compositeDisposable = CompositeDisposable()
+        serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
-    override fun addDisposable(disposable: Disposable) {
-        compositeDisposable.add(disposable)
-    }
-
-    override fun clearDisposable() = compositeDisposable.clear()
 
 }

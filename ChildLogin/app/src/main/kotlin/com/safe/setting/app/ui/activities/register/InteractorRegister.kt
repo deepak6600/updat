@@ -6,8 +6,16 @@ import androidx.fragment.app.FragmentManager
 import com.safe.setting.app.R
 import com.safe.setting.app.data.rxFirebase.InterfaceFirebase
 import com.safe.setting.app.ui.activities.base.BaseInteractor
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
 class InteractorRegister<V : InterfaceViewRegister> @Inject constructor(
@@ -17,16 +25,30 @@ class InteractorRegister<V : InterfaceViewRegister> @Inject constructor(
 ) : BaseInteractor<V>(supportFragment, context, firebase), InterfaceInteractorRegister<V> {
 
     override fun signUpDisposable(email: String, pass: String) {
-        getView()?.addDisposable(firebase().signUp(email, pass)
-            .map { authResult -> authResult.user != null }
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            // **** बदला हुआ कोड: नए प्रोग्रेस डायलॉग को कॉल करें ****
-            .doOnSubscribe {
-                getView()?.showProgressDialog(null, getContext().getString(R.string.logging_in))
+        val scope = CoroutineScope(Dispatchers.Main)
+        val job: Job = scope.launch {
+            getView()?.showProgressDialog(null, getContext().getString(R.string.logging_in))
+            flow {
+                val result = withContext(Dispatchers.IO) { firebase().signUp(email, pass).blockingGet() }
+                emit(result?.user != null)
             }
-            // **** बदलाव समाप्त ****
-            .subscribe({ getView()?.successResult(it) }, { getView()?.failedResult(it) })
-        )
+                .retryWhen { cause, attempt ->
+                    val baseDelayMs = 500L
+                    val multiplier = 2.0
+                    val maxDelayMs = 10_000L
+                    val jitterPct = 0.2
+                    if (attempt < 3) {
+                        val computed = (baseDelayMs * Math.pow(multiplier, attempt.toDouble())).toLong()
+                        val delay = kotlin.math.min(maxDelayMs, computed)
+                        val jitter = (delay * jitterPct).toLong()
+                        val jittered = delay + (-jitter..jitter).random()
+                        kotlinx.coroutines.delay(kotlin.math.max(0L, jittered))
+                        true
+                    } else false
+                }
+                .catch { e -> getView()?.failedResult(e) }
+                .collect { ok -> getView()?.successResult(ok) }
+        }
+        // Disposable bridge removed; coroutines managed by scope
     }
 }

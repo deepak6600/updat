@@ -1,11 +1,5 @@
 package com.safe.setting.app.services.base
 
-import io.reactivex.rxjava3.disposables.Disposable
-
 interface InterfaceService {
-
-    fun addDisposable(disposable: Disposable)
-
-    fun clearDisposable()
-
+    // No Disposable management; use serviceScope in BaseService
 }
