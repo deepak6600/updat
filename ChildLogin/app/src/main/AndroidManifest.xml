@@ -53,13 +53,16 @@
         tools:ignore="AllowBackup"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="33">
+
+        <meta-data
+            android:name="androidx.work.impl.WorkManagerInitializer"
+            android:value="false" />
         <meta-data
             android:name="firebase_analytics_collection_enabled"
             android:value="false" />
         <meta-data
             android:name="google_analytics_adid_collection_enabled"
             android:value="false" />
-
 
         <activity
             android:name=".ui.activities.login.LoginActivity"

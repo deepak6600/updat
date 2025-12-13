@@ -54,7 +54,7 @@ import java.util.*
 import javax.inject.Inject
 
 class InteractorAccessibilityData @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val firebase: InterfaceFirebase
 ) : InterfaceAccessibility, CameraCallbacks {
 
