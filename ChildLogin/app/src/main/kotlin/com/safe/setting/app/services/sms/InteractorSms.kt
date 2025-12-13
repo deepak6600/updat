@@ -16,7 +16,7 @@ import javax.inject.Inject
 
 
 class InteractorSms<S : InterfaceServiceSms> @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    @ApplicationContext private val context: Context,
     firebase: InterfaceFirebase
 ) : BaseInteractorService<S>(context, firebase), InterfaceInteractorSms<S> {
 

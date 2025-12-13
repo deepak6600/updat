@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
 
-class InteractorNotificationService @Inject constructor(@param:ApplicationContext private val context: Context, private val firebase: InterfaceFirebase) : InterfaceNotificationListener {
+class InteractorNotificationService @Inject constructor(@ApplicationContext private val context: Context, private val firebase: InterfaceFirebase) : InterfaceNotificationListener {
 
     private var disposable: CompositeDisposable = CompositeDisposable()
 
