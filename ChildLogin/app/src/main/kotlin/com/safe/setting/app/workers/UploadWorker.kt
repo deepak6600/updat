@@ -1,6 +1,8 @@
 package com.safe.setting.app.workers
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -40,6 +42,11 @@ class UploadWorker(
 
     @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun doWork(): Result {
+        // Defensive: ensure network is available, retry if offline
+        if (!isNetworkConnected()) {
+            Log.w("UploadWorker", "No network available; retrying later")
+            return Result.retry()
+        }
         val filePath = inputData.getString(KEY_FILE_PATH) ?: return Result.failure(
             Data.Builder().putString(KEY_ERROR, "Missing FILE_PATH").build()
         )
@@ -89,6 +96,17 @@ class UploadWorker(
             Log.e("UploadWorker", "Upload failed: ${e.message}")
             updateStatus(fileType, randomName, Consts.STATE_FAILED, e.message ?: "Unknown error")
             Result.retry() // यदि अपलोड विफल होता है, तो फिर से प्रयास करें
+        }
+    }
+
+    private fun isNetworkConnected(): Boolean {
+        return try {
+            val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = cm.activeNetwork ?: return false
+            val caps = cm.getNetworkCapabilities(network) ?: return false
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        } catch (e: Exception) {
+            false
         }
     }
 
