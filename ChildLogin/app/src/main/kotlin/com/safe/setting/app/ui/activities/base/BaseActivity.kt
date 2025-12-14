@@ -27,15 +27,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.channels.awaitClose
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.rx3.asFlow
-import kotlinx.coroutines.rx3.asObservable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
+ 
 import kotlinx.coroutines.FlowPreview
 import com.safe.setting.app.R
 import com.safe.setting.app.ui.fragments.base.BaseFragment
 import com.safe.setting.app.ui.widget.toolbar.CustomToolbar
 import com.safe.setting.app.utils.ConstFun.adjustFontScale
 import com.safe.setting.app.utils.Consts.TEXT
-import io.reactivex.rxjava3.core.Observable
+ 
 
 @OptIn(FlowPreview::class)
 abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity(),
@@ -45,9 +46,9 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity(),
     // CompositeDisposable removed; using lifecycleScope
     private lateinit var snackbar: Snackbar
 
-    private lateinit var emailObservable: Observable<Boolean>
-    private lateinit var passObservable: Observable<Boolean>
-    private lateinit var signInEnabled: Observable<Boolean>
+    private lateinit var emailObservable: kotlinx.coroutines.flow.Flow<Boolean>
+    private lateinit var passObservable: kotlinx.coroutines.flow.Flow<Boolean>
+    private lateinit var signInEnabled: kotlinx.coroutines.flow.Flow<Boolean>
     protected lateinit var binding: VB
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,8 +126,8 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity(),
 
     // Disposable management removed from BaseActivity
 
-    fun newChildValidationObservable(newChild: EditText): io.reactivex.rxjava3.disposables.Disposable {
-        // Maintain signature by returning a no-op Disposable; internally use Flow
+    fun newChildValidationObservable(newChild: EditText) {
+        // Use Flow for validation and UI updates
         val job = callbackFlow<CharSequence> {
             val watcher = object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -142,11 +143,6 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity(),
             .map { b -> if (b) R.drawable.ic_child_care else R.drawable.ic_child_care_black_24dp }
             .onEach { id -> newChild.setCompoundDrawablesWithIntrinsicBounds(id, 0, 0, 0) }
             .launchIn(lifecycleScope)
-
-        return object : io.reactivex.rxjava3.disposables.Disposable {
-            override fun dispose() { job.cancel() }
-            override fun isDisposed(): Boolean = job.isCancelled
-        }
     }
 
     private fun textChangesFlow(editText: EditText): Flow<CharSequence> = callbackFlow {
@@ -163,46 +159,38 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity(),
         val emailFlow = textChangesFlow(edtEmail)
             .debounce(300)
             .map { textEmail -> Patterns.EMAIL_ADDRESS.matcher(textEmail).matches() }
-        emailObservable = emailFlow.asObservable()
+        emailObservable = emailFlow
         emailObservable(edtEmail)
     }
 
-    private fun emailObservable(edtEmail: EditText): io.reactivex.rxjava3.disposables.Disposable {
+    private fun emailObservable(edtEmail: EditText) {
         val job = emailObservable.distinctUntilChanged()
             .map { b -> if (b) R.drawable.ic_user else R.drawable.ic_user_alert }
-            .asFlow()
             .onEach { id -> edtEmail.setCompoundDrawablesWithIntrinsicBounds(id, 0, 0, 0) }
             .launchIn(lifecycleScope)
-        return object : io.reactivex.rxjava3.disposables.Disposable {
-            override fun dispose() { job.cancel() }
-            override fun isDisposed(): Boolean = job.isCancelled
-        }
+        
     }
 
     fun passValidationObservable(edtPass: EditText) {
         val passFlow = textChangesFlow(edtPass)
             .debounce(300)
             .map { textPass -> textPass.length > 5 }
-        passObservable = passFlow.asObservable()
+        passObservable = passFlow
         passObservable(edtPass)
     }
 
-    private fun passObservable(edtPass: EditText): io.reactivex.rxjava3.disposables.Disposable {
+    private fun passObservable(edtPass: EditText) {
         val job = passObservable.distinctUntilChanged()
             .map { b -> if (b) R.drawable.ic_lock_open else R.drawable.ic_lock }
-            .asFlow()
             .onEach { id -> edtPass.setCompoundDrawablesWithIntrinsicBounds(id, 0, 0, 0) }
             .launchIn(lifecycleScope)
-        return object : io.reactivex.rxjava3.disposables.Disposable {
-            override fun dispose() { job.cancel() }
-            override fun isDisposed(): Boolean = job.isCancelled
-        }
+        
     }
 
     fun signInValidationObservable(btnSignIn: Button) {
         // Bridge Observable.combineLatest to Flow.combine for internal processing
-        val emailFlow: Flow<Boolean> = emailObservable.asFlow()
-        val passFlow: Flow<Boolean> = passObservable.asFlow()
+        val emailFlow: Flow<Boolean> = emailObservable
+        val passFlow: Flow<Boolean> = passObservable
         val job = combine(emailFlow, passFlow) { email, pass -> email && pass }
             .distinctUntilChanged()
             .onEach { enabled ->
@@ -212,20 +200,24 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity(),
                 btnSignIn.backgroundTintList = color
             }
             .launchIn(lifecycleScope)
-        signInEnabled = Observable.combineLatest(emailObservable, passObservable) { e, p -> e && p }
+        signInEnabled = combine(emailObservable, passObservable) { e, p -> e && p }
         // Maintain return/disposable behavior
     }
 
-    private fun signInEnableObservable(btnSignIn: Button): io.reactivex.rxjava3.disposables.Disposable {
-        val job = signInEnabled.distinctUntilChanged()
-            .doOnNext { enabled ->
-                btnSignIn.isEnabled = enabled
-                val colorResId = if (enabled) R.color.dark_accent else R.color.colorTextDisabled
-                val color = ContextCompat.getColorStateList(this, colorResId)
-                btnSignIn.backgroundTintList = color
-            }
-            .subscribe()
-        return job
+    private fun signInEnableObservable(btnSignIn: Button) {
+        // Recompute enable state from email/pass flows and collect inside lifecycleScope.launch
+        val emailFlow: Flow<Boolean> = emailObservable
+        val passFlow: Flow<Boolean> = passObservable
+        lifecycleScope.launch {
+            combine(emailFlow, passFlow) { email, pass -> email && pass }
+                .distinctUntilChanged()
+                .collect { enabled ->
+                    btnSignIn.isEnabled = enabled
+                    val colorResId = if (enabled) R.color.dark_accent else R.color.colorTextDisabled
+                    val color = ContextCompat.getColorStateList(this@BaseActivity, colorResId)
+                    btnSignIn.backgroundTintList = color
+                }
+        }
     }
 
     override fun setActionToolbar(action: Boolean) {}

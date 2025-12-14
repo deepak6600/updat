@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.rx3.await
+ 
 import javax.inject.Inject
 
 class InteractorLogin<V : InterfaceViewLogin> @Inject constructor(
@@ -33,9 +33,9 @@ class InteractorLogin<V : InterfaceViewLogin> @Inject constructor(
             getView()?.showProgressDialog(null, getContext().getString(R.string.logging_in))
             flow {
                 val result = withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    firebase().signIn(email, pass).blockingGet()
+                    firebase().signIn(email, pass)
                 }
-                emit(result?.user != null)
+                emit(result.isSuccess && result.getOrNull()?.user != null)
             }
                 .retryWhen { cause, attempt ->
                     val baseDelayMs = 500L

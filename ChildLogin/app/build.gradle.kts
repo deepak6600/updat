@@ -93,7 +93,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     // Firebase
-    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
+    implementation(platform("com.google.firebase:firebase-bom:34.7.0"))
     implementation("com.google.firebase:firebase-auth:24.0.1")
     implementation("com.google.firebase:firebase-database:22.0.1")
     implementation("com.google.android.gms:play-services-location:21.3.0")
@@ -128,16 +128,12 @@ dependencies {
     // Hilt Worker integration (Updated to 1.2.0)
     implementation("androidx.hilt:hilt-work:1.3.0")
     ksp("androidx.hilt:hilt-compiler:1.3.0")
-
-    // Keep minimal Rx deps for existing facades until full UI call-sites are migrated
-    // Removed rxandroid; coroutines handle scheduling
-    // Coroutines <-> Rx interop (temporary for Phase 1 adapters)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-rx3:1.8.1")
+    // Removed Rx interop: project now uses pure coroutines Flow
 
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("app.cash.turbine:turbine:1.1.0")
+    testImplementation("app.cash.turbine:turbine:1.2.1")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
 }

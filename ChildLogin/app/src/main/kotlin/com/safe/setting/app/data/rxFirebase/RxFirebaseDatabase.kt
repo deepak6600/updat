@@ -8,19 +8,18 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.ValueEventListener
 // import com.pawegio.kandroid.e // **** पुराना इम्पोर्ट हटा दिया गया ****
-import io.reactivex.rxjava3.core.BackpressureStrategy
-import io.reactivex.rxjava3.core.Flowable
-import io.reactivex.rxjava3.core.Maybe
-import io.reactivex.rxjava3.exceptions.OnErrorNotImplementedException
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.rx3.asFlowable
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 object RxFirebaseDatabase {
 
-    fun Query.rxObserveValueEvent(auth : FirebaseAuth): Flowable<DataSnapshot> {
-        // Internal coroutine-based stream; bridge to Rx Flowable while preserving DROP semantics
-        val flow = callbackFlow<DataSnapshot> {
+    fun Query.rxObserveValueEvent(auth : FirebaseAuth): Flow<DataSnapshot> {
+        // Pure Kotlin Flow using callbackFlow to mirror Rx value events
+        return callbackFlow<DataSnapshot> {
             val valueEventListener = object : ValueEventListener {
                 override fun onDataChange(dataSnapshot: DataSnapshot) {
                     trySend(dataSnapshot)
@@ -29,8 +28,6 @@ object RxFirebaseDatabase {
                 override fun onCancelled(error: DatabaseError) {
                     try {
                         if (auth.currentUser != null) close(Throwable(error.message))
-                    } catch (er: OnErrorNotImplementedException) {
-                        Log.e(TAG, er.message.toString())
                     } catch (t: Throwable) {
                         Log.e(TAG, t.message.toString())
                     }
@@ -39,18 +36,23 @@ object RxFirebaseDatabase {
             addValueEventListener(valueEventListener)
             awaitClose { removeEventListener(valueEventListener) }
         }
-        // Note: asFlowable() doesn't take BackpressureStrategy in rx3; we'll keep default buffering and
-        // preserve external BackpressureStrategy.DROP at call sites if needed.
-        return flow.asFlowable()
     }
 
-    fun Query.rxObserveSingleValueEvent(): Maybe<DataSnapshot> {
-        return Maybe.create { emitter ->
-            addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(dataSnapshot: DataSnapshot) = emitter.onSuccess(dataSnapshot)
-                override fun onCancelled(error: DatabaseError) { if (!emitter.isDisposed) emitter.onError(Throwable(error.message)) }
-            })
+    suspend fun Query.rxObserveSingleValueEvent(): DataSnapshot =
+        suspendCancellableCoroutine { cont ->
+            val listener = object : ValueEventListener {
+                override fun onDataChange(dataSnapshot: DataSnapshot) {
+                    cont.resume(dataSnapshot)
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    cont.resumeWithException(Throwable(error.message))
+                }
+            }
+            addListenerForSingleValueEvent(listener)
+            cont.invokeOnCancellation {
+                // No explicit remove for single event; cancellation is rare here.
+            }
         }
-    }
 
 }

