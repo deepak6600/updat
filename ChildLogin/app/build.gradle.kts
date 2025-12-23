@@ -7,14 +7,19 @@ plugins {
 
 }
 
+// Read SDK versions from gradle.properties
+val androidCompileSdk: String by project
+val androidTargetSdk: String by project
+val androidMinSdk: String by project
+
 android {
     namespace = "com.safe.setting.app"
-    compileSdk = 36
+    compileSdk = androidCompileSdk.toInt()
 
     defaultConfig {
         applicationId = "com.safe.setting.app"
-        minSdk = 23
-        targetSdk = 36
+        minSdk = androidMinSdk.toInt()
+        targetSdk = androidTargetSdk.toInt()
         versionCode = 8
         versionName = "8.80008"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -39,8 +44,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     externalNativeBuild {
@@ -67,10 +72,10 @@ hilt {
 
 // Set the JVM toolchain and compiler options for Kotlin
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(11)
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
     }
 }
 
